@@ -1,5 +1,5 @@
 import cross_sectional_metrics
-# import temporal_difference_agg
+# import temporal_difference
 import utils
 import pandas as pd
 import numpy as np
