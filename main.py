@@ -1,0 +1,128 @@
+import cross_sectional_metrics
+# import temporal_difference_agg
+import utils
+import pandas as pd
+import numpy as np
+import os
+
+def aggregate_metrics(results_list):
+    """
+    여러 관계(테이블)에서 나온 metric 딕셔너리들의 리스트를 받아 평균을 계산합니다.
+    """
+    if not results_list:
+        return {}
+    
+    # 결과가 하나뿐이면(Rossmann 등) 그대로 반환
+    if len(results_list) == 1:
+        return results_list[0]
+    
+    aggregated = {}
+    # 첫 번째 결과의 키를 기준으로 순회
+    all_keys = results_list[0].keys()
+    
+    for key in all_keys:
+        # 해당 키에 대한 모든 결과값 수집
+        values = [res.get(key) for res in results_list]
+        
+        # 1. 값이 모두 딕셔너리인 경우 -> 재귀 호출
+        if all(isinstance(v, dict) for v in values):
+            aggregated[key] = aggregate_metrics(values)
+            
+        # 2. 값이 모두 수치형(int, float)인 경우 -> 평균 계산
+        elif all(isinstance(v, (int, float, np.number)) for v in values):
+            aggregated[key] = float(np.mean(values))
+            
+        # 3. 그 외(문자열 등) -> 첫 번째 값 유지 (또는 필요시 병합 로직 추가)
+        else:
+            aggregated[key] = values[0]
+            
+    return aggregated
+
+def run_temporal_benchmark(
+    real_path: str = 'data/rossmann_subsampled_real.csv',
+    synth_path: str = 'data/rossmann_subsampled_synthetic.csv',
+    dataset_name: str = 'rossmann_subsampled',
+):
+    
+    # 월별 binning
+    benchmark = cross_sectional_metrics.TemporalBenchmark(
+        time_column='Date',
+        bin_strategy='daily',
+    )    
+    
+    # lag_result = temporal_difference.lag_k_difference(
+    #     real_df=real_df,
+    #     syn_df=synth_df,
+    #     features=available_features,
+    #     lag = 1
+    # )
+
+    # print(f"lag-1 difference results:\n{lag_result['lag_k_difference_overall']}")
+    
+    all_relationships_results = []
+    
+    metadata = utils.load_metadata(real_path, dataset_name)
+    for relationship in metadata['relationships']:
+        parent_table = relationship['parent_table_name']
+        child_table = relationship['child_table_name']
+        
+        print(f"\n--- 테이블 관계: {parent_table} -> {child_table} ---")
+
+        real_data_path = os.path.join(real_path, dataset_name)
+        real_df, _, _ = utils.load_and_preprocess_data(real_data_path, metadata, parent_table, child_table)
+        
+        synth_df, _, _ = utils.load_and_preprocess_data(synth_path, metadata, parent_table, child_table)
+        
+        available_features = synth_df.columns
+        
+        # 종합 평가 수행
+        try:
+            results = benchmark.comprehensive_evaluation(
+                real_df=real_df,
+                synth_df=synth_df,
+                features=available_features,
+            )
+            
+            # [수정] 결과 수집
+            all_relationships_results.append(results)
+            print(f"✅ Completed evaluation for {child_table}")
+            
+        except Exception as e:
+            print(f"❌ Error evaluating {child_table}: {str(e)}")
+
+    # [수정] 결과 집계 (Aggregation)
+    # 관계가 1개면 그대로, 2개 이상이면 평균 계산
+    final_results = aggregate_metrics(all_relationships_results)
+        
+    # 결과 출력
+    print("\n\n" + "=" * 80)
+    print(f"SUMMARY RESULTS ({len(all_relationships_results)} relationships aggregated)")
+    print("=" * 80)
+    print(final_results) # 필요시 주석 해제
+    
+    return final_results
+
+
+if __name__ == "__main__":
+    
+    #                 0           1             2           3        4        5 
+    syn_models = ['CLAVADDPM', 'RCTGAN', 'REALTABFORMER', 'RGCLD', 'SDV', 'RelDiff']
+    syn_model_name = syn_models[1]
+    
+    DATASET = 'rossmann_subsampled'
+    # DATASET = 'walmart_subsampled'
+        
+    # 실행
+    results = run_temporal_benchmark(
+        real_path = "/home/yjung/syntherela/experiments/data/original/",
+        synth_path  = f"/home/yjung/syntherela/experiments/data/synthetic/{DATASET}/{syn_model_name}/1/sample1/",
+        dataset_name = DATASET,
+    )
+    
+    if results:
+        # 결과 저장
+        import json
+        with open('temporal_benchmark_results.json', 'w') as f:
+            json.dump(results, f, indent=2, default=str)
+        print("\n✅ Results saved to temporal_benchmark_results.json")
+
