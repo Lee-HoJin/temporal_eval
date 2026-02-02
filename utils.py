@@ -5,6 +5,7 @@ import json
 from metadata import Metadata
 from pathlib import Path
 import os
+from typing import Dict, List, Optional
 
 from sklearn.preprocessing import MinMaxScaler
 
@@ -138,7 +139,7 @@ def load_and_preprocess_data(data_path, metadata, parent_table_name, child_table
         print("Error: 병합 결과가 비어있음")
         return None
     
-    print(f"✅ 병합 성공: {len(merged_df)} rows")
+    print(f"✅ Merge Completed: {len(merged_df)} rows")
     
     # 7. Datetime 컬럼 처리
     datetime_col, datetime_format = get_datetime_col_info(metadata, child_table_name)
@@ -187,13 +188,13 @@ def unify_key_types(parent_df, child_df, parent_key, child_key):
     if parent_success and child_success:
         parent_df[parent_key] = parent_numeric
         child_df[child_key] = child_numeric
-        print(f"✅ 키를 숫자로 변환: {parent_key}, {child_key}")
+        # print(f"✅ 키를 숫자로 변환: {parent_key}, {child_key}")
         return parent_df, child_df
     
     # 전략 2: 문자열로 변환
     parent_df[parent_key] = parent_original.astype(str).str.strip()
     child_df[child_key] = child_original.astype(str).str.strip()
-    print(f"✅ 키를 문자열로 변환: {parent_key}, {child_key}")
+    # print(f"✅ 키를 문자열로 변환: {parent_key}, {child_key}")
     
     return parent_df, child_df
 
@@ -235,9 +236,9 @@ def diagnose_merge(parent_df, child_df, parent_key, child_key):
     
     match_ratio = len(common_keys) / len(child_keys)
     
-    print(f"📊 Parent 고유 키: {len(parent_keys)}")
-    print(f"📊 Child 고유 키: {len(child_keys)}")
-    print(f"📊 공통 키: {len(common_keys)} ({match_ratio:.1%})")
+    # print(f"📊 Parent 고유 키: {len(parent_keys)}")
+    # print(f"📊 Child 고유 키: {len(child_keys)}")
+    # print(f"📊 공통 키: {len(common_keys)} ({match_ratio:.1%})")
     
     # ✅ 공통 키가 없으면 병합 불가 (NO FALLBACK!)
     if len(common_keys) == 0:
@@ -276,3 +277,51 @@ def diagnose_merge(parent_df, child_df, parent_key, child_key):
     
     result['can_merge'] = True
     return result
+
+
+def debug_temporal_overlap(real_df, synth_df, time_col='Date', target_col='IsHoliday'):
+    print(f"🔍 디버깅: {target_col} 컬럼 및 시간 범위 확인")
+    print("-" * 50)
+    
+    # 1. 날짜 형식 변환 및 범위 확인
+    real_df[time_col] = pd.to_datetime(real_df[time_col])
+    synth_df[time_col] = pd.to_datetime(synth_df[time_col])
+    
+    r_min, r_max = real_df[time_col].min(), real_df[time_col].max()
+    s_min, s_max = synth_df[time_col].min(), synth_df[time_col].max()
+    
+    print(f"📅 Real Date Range : {r_min} ~ {r_max}")
+    print(f"📅 Synth Date Range: {s_min} ~ {s_max}")
+    
+    # 2. 겹치는 기간 확인
+    overlap_start = max(r_min, s_min)
+    overlap_end = min(r_max, s_max)
+    
+    if overlap_start > overlap_end:
+        print("❌ [CRITICAL] 겹치는 시간 구간이 전혀 없습니다! (JSD = 0의 원인)")
+        return
+    else:
+        print(f"✅ Overlap Period  : {overlap_start} ~ {overlap_end}")
+
+    # 3. 데이터 타입 확인
+    print(f"\n🏷️ Data Types:")
+    print(f"   Real [{target_col}]: {real_df[target_col].dtype} (예: {real_df[target_col].iloc[0]})")
+    print(f"   Synth [{target_col}]: {synth_df[target_col].dtype} (예: {synth_df[target_col].iloc[0]})")
+    
+    if real_df[target_col].dtype != synth_df[target_col].dtype:
+        print("⚠️ [WARNING] 데이터 타입이 다릅니다! (Bool vs Float 등)")
+        print("   -> 비교 전 통일 필요 (예: .astype(str) or .astype(int))")
+
+    # 4. 실제 구간별 데이터 존재 여부 샘플링 (첫 월/주)
+    # 월단위 binning 예시
+    sample_bin = real_df[time_col].dt.to_period('M').astype(str).unique()[0]
+    
+    r_count = real_df[real_df[time_col].dt.to_period('M').astype(str) == sample_bin].shape[0]
+    s_count = synth_df[synth_df[time_col].dt.to_period('M').astype(str) == sample_bin].shape[0]
+    
+    print(f"\n📦 Sample Bin ({sample_bin}) Counts:")
+    print(f"   Real: {r_count} rows")
+    print(f"   Synth: {s_count} rows")
+    
+    if r_count > 0 and s_count == 0:
+        print("❌ [CHECK] Real 데이터는 있는데 Synth 데이터가 해당 구간에 없습니다.")
