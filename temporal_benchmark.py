@@ -8,6 +8,7 @@ from typing import Dict, List, Optional
 
 import sys
 from scipy.stats import ks_2samp
+from scipy import signal
 
 from sklearn.metrics.pairwise import rbf_kernel, polynomial_kernel, linear_kernel
 
@@ -36,7 +37,7 @@ class TemporalBenchmark:
         custom_bins: Optional[List] = None,
     ):
         self.metadata = metadata
-        self.time_column = time_column
+        self.time_column = time_column  
         self.bin_strategy = bin_strategy
         self.custom_bins = custom_bins
     
@@ -141,12 +142,15 @@ class TemporalBenchmark:
                 .groupby("time_bin")[feat]
                 .count()
             )
+            # print(f"{feat} 컬럼, real counts: {real_counts}")
+
             syn_counts = (
                 syn_binned
                 .groupby("time_bin")[feat]
                 .count()
             )
-
+            # print(f"{feat} 컬럼, syn counts: {syn_counts}")
+            
             aligned = pd.concat(
                 [real_counts, syn_counts],
                 axis=1,
@@ -299,10 +303,19 @@ class TemporalBenchmark:
             if not common_bins:
                 continue
 
+
+            # print(f"찐 bin들 \n{real_binned}")
+            # print(f"짭 bin들 \n{syn_binned}")
+
+            # print(common_bins)
+
             jsds = []
             for tb in common_bins:
                 r = real_binned.loc[real_binned["time_bin"] == tb, feat].dropna()
                 s = syn_binned.loc[syn_binned["time_bin"] == tb, feat].dropna()
+
+                # print(f"r: \n{r}")
+                # print(f"s: \n{s}")
 
                 if len(r) < min_count_per_bin or len(s) < min_count_per_bin:
                     continue
@@ -347,6 +360,15 @@ class TemporalBenchmark:
             real_binned[feat] = pd.to_numeric(real_binned[feat], errors="coerce")
             syn_binned[feat] = pd.to_numeric(syn_binned[feat], errors="coerce")
 
+            # r_min, r_max = real_binned[feat].min(), real_binned[feat].max()
+            # s_min, s_max = syn_binned[feat].min(), syn_binned[feat].max()
+
+            # print(
+            #     f"[{feat}] "
+            #     f"REAL(min,max)=({r_min:.6g}, {r_max:.6g}) | "
+            #     f"SYN(min,max)=({s_min:.6g}, {s_max:.6g})"
+            # )
+
             common_bins = sorted(set(real_binned["time_bin"]).intersection(set(syn_binned["time_bin"])))
             if not common_bins:
                 continue
@@ -380,7 +402,7 @@ class TemporalBenchmark:
         min_count_per_bin: int = 5,
     ) -> Dict:
         """
-        시간 bin별 feature의 KS-Complement 계산
+        시간 bin별 feature의 KS 계산
         - KS statistic: 두 분포의 최대 차이 (0에 가까울수록 유사)
         - KS complement: 1 - KS statistic (1에 가까울수록 유사)
         
@@ -558,6 +580,217 @@ class TemporalBenchmark:
             "temporal_mmd_overall": float(np.mean(mmds)) if mmds else np.nan,
         }
         return out
+    
+    def temporal_dynamics(
+        self,
+        real_df: pd.DataFrame,
+        syn_df: pd.DataFrame,
+        parent_key: str,
+        features: List[str],
+        time_column: Optional[str] = None,
+    ) -> Dict:
+        """
+        시계열 동적 특성 비교
+        - Turning Points (1차 차분): 변화 빈도
+        - Smoothness (2차 차분): 변화의 급격도 (곡률)
+        
+        스케일링된 데이터를 입력받음 (테이블 간 비교용)
+        Turning Points는 단조변환이므로 스케일링 영향 없음
+        """
+        
+        def _calculate_dynamics_per_entity(df, parent_key, datetime_col, numeric_col):
+            """각 개체별 1차/2차 차분 통계 계산"""
+            tp_rates      = []
+            masd_values   = []  # Mean Absolute Second Difference
+            pooled_abs_d2 = []
+            
+            if df.empty or numeric_col not in df.columns:
+                return None
+            
+            # 정렬
+            if datetime_col and datetime_col in df.columns:
+                df_sorted = df.sort_values([parent_key, datetime_col])
+            else:
+                df_sorted = df.sort_values([parent_key])
+            
+            for _, group in df_sorted.groupby(parent_key):
+                values = group[numeric_col].dropna().values
+                
+                # 최소 3개 필요 (2차 차분)
+                if len(values) < 3:
+                    continue
+                
+                # 상수 시계열 제외
+                if np.std(values) < 1e-10:
+                    continue
+                
+                # === 1차 차분: Turning Points ===
+                d1 = np.diff(values)
+                signs = np.sign(d1)
+                signs[signs == 0] = 1  # 0인 경우 양수로 처리
+                sign_changes = np.sum(signs[1:] != signs[:-1])
+                tp_rate = sign_changes / max(len(d1) - 1, 1)
+                tp_rates.append(tp_rate)
+                
+                # === 2차 차분: Smoothness ===
+                d2 = np.diff(values, n=2)  # x[t+1] - 2*x[t] + x[t-1]
+                masd = float(np.mean(np.abs(d2)))
+                masd_values.append(masd)
+                pooled_abs_d2.extend(np.abs(d2).tolist())
+            
+            if not tp_rates or not masd_values:
+                return None
+            
+            return {
+                'tp_rate': float(np.mean(tp_rates)),
+                'masd': float(np.mean(masd_values)),
+                'pooled_d2': pooled_abs_d2,
+            }
+        
+        # 메인 로직
+        results = {
+            "per_feature": {},
+            "turning_point_diff_overall": np.nan,
+            "smoothness_diff_overall": np.nan,
+            "smoothness_wd_overall": np.nan,
+        }
+        
+        tp_diffs         = []
+        smoothness_diffs = []
+        smoothness_wds   = []
+        
+        for feat in features:
+            if feat not in real_df.columns or feat not in syn_df.columns:
+                continue
+            
+            real_dyn = _calculate_dynamics_per_entity(
+                real_df, parent_key, time_column, feat
+            )
+            syn_dyn = _calculate_dynamics_per_entity(
+                syn_df, parent_key, time_column, feat
+            )
+            
+            if real_dyn is None or syn_dyn is None:
+                continue
+            
+            # Turning Points 차이 (이미 [0,1] 범위)
+            tp_diff = abs(real_dyn['tp_rate'] - syn_dyn['tp_rate'])
+            
+            # Smoothness 차이 (스케일링된 데이터라 직접 비교 가능)
+            smoothness_diff = abs(real_dyn['masd'] - syn_dyn['masd'])
+            smoothness_wd_pooled = float(wasserstein_distance(real_dyn['pooled_d2'], syn_dyn['pooled_d2']))
+            
+            results["per_feature"][feat] = {
+                "real_tp_rate": real_dyn['tp_rate'],
+                "syn_tp_rate": syn_dyn['tp_rate'],
+                "tp_diff": tp_diff,
+                "real_smoothness": real_dyn['masd'],
+                "syn_smoothness": syn_dyn['masd'],
+                "smoothness_diff": smoothness_diff,
+                "smoothness_wd_pooled": smoothness_wd_pooled,
+            }
+            
+            if not np.isnan(tp_diff):
+                tp_diffs.append(tp_diff)
+            if not np.isnan(smoothness_diff):
+                smoothness_diffs.append(smoothness_diff)
+            if not np.isnan(smoothness_wd_pooled):
+                smoothness_wds.append(smoothness_wd_pooled)
+        
+        if tp_diffs:
+            results["turning_point_diff_overall"] = float(np.mean(tp_diffs))
+        if smoothness_diffs:
+            results["smoothness_diff_overall"] = float(np.mean(smoothness_diffs))
+        if smoothness_wds:
+            results["smoothness_wd_overall"] = float(np.mean(smoothness_wd_pooled))
+        
+        return results
+
+    def temporal_spectral_analysis(
+        self, real_df, syn_df, parent_key, features,
+        time_column=None, normalize_psd=True 
+    ):
+        """Power Spectral Density (PSD) 비교"""
+        
+        def _calculate_psd_per_entity(df, parent_key, datetime_col, numeric_col):
+            all_psds = []
+           
+            for _, group in df.groupby(parent_key):
+                values = group[numeric_col].dropna().values
+                if len(values) < 20:
+                    continue
+                
+                # 상수 시계열 제외
+                if values.std() < 1e-10:
+                    continue
+                
+                # PSD 계산
+                freqs, psd = signal.welch(
+                    values, 
+                    fs=1.0,
+                    nperseg=min(len(values)//2, 32),
+                    scaling='density'  # 'density' 모드 사용
+                )
+                
+                # nan/inf 체크
+                if np.any(np.isnan(psd)) or np.any(np.isinf(psd)):
+                    continue
+                
+                all_psds.append(psd)
+            
+            if not all_psds:
+                return None, None
+            
+            mean_psd = np.mean(all_psds, axis=0)
+            
+            # DC 성분(0 Hz) 제외
+            freqs = freqs[1:]
+            mean_psd = mean_psd[1:]
+            
+            # ⭐ PSD 정규화 (합이 1이 되도록)
+            if normalize_psd and mean_psd.sum() > 0:
+                mean_psd = mean_psd / mean_psd.sum()
+            
+            return freqs, mean_psd
+        
+        results = {
+            "per_feature": {}, 
+            "spectral_wd_overall": np.nan,
+        }
+        
+        wd_scores = []
+
+        for feat in features:
+            freqs_r, psd_r = _calculate_psd_per_entity(
+                real_df, parent_key, time_column, feat
+            )
+            freqs_s, psd_s = _calculate_psd_per_entity(
+                syn_df, parent_key, time_column, feat
+            )
+            
+            if psd_r is None or psd_s is None:
+                continue
+            
+            # nan/inf 최종 체크
+            if (np.any(np.isnan(psd_r)) or np.any(np.isinf(psd_r)) or
+                np.any(np.isnan(psd_s)) or np.any(np.isinf(psd_s))):
+                continue
+            
+            # Wasserstein Distance
+            wd = float(wasserstein_distance(psd_r, psd_s))
+              
+            results["per_feature"][feat] = {
+                "spectral_wd": wd,
+                "dominant_freq_real": freqs_r[np.argmax(psd_r)],  # 주요 주파수
+                "dominant_freq_syn": freqs_s[np.argmax(psd_s)],
+            }
+            
+            wd_scores.append(wd)
+        
+        if wd_scores:
+            results["spectral_wd_overall"] = float(np.mean(wd_scores))
+        
+        return results
 
     def comprehensive_evaluation(
         self,
@@ -595,21 +828,11 @@ class TemporalBenchmark:
         results = {}
         
         # === 기본 메트릭 (전체 features) ===
-        
-        # # Bin Length Discrepancy
-        # metrics_fld = self.bin_length_discrepancy(
-        #     real_df, synth_df, features
-        # )
-        # results['bin_length_discrepancy'] = metrics_fld
-        # print(f"Bin Length Discrepancy: {metrics_fld.get('bin_length_discrepancy_overall', np.nan):.4f}")
 
-
-        if parent_key and parent_key in real_df.columns:
-            print()
-            
+        if parent_key and parent_key in real_df.columns:            
             # 전이 행렬 분석
             tm_results = transition_matrix_analysis(
-                real_df, synth_df, parent_key, features, n_bins=5, time_column=self.time_column
+                real_df, synth_df, parent_key, num_cols, n_bins=5, time_column=self.time_column
             )
             results['transition_matrix'] = tm_results
             print(f"Transition Matrix L1: {tm_results.get('tm_l1_overall', np.nan):.4f}")
@@ -624,6 +847,18 @@ class TemporalBenchmark:
                 results['lag_diff'] = lag_results
                 print(f"Lag-{k} Diff KS: {lag_results.get('lag_diff_ks_overall', np.nan):.4f}")
                 print(f"Lag-{k} Diff Wasserstein: {lag_results.get('lag_diff_wasserstein_overall', np.nan):.4f}")
+
+                print("----")
+
+                metrics_dynamics = self.temporal_dynamics(
+                    real_df_scaled, synth_df_scaled, parent_key, features=num_cols, time_column=self.time_column
+                )
+                results['temporal dynamics'] = metrics_dynamics
+                print(f"Temporal TP Diff:         {metrics_dynamics.get('turning_point_diff_overall', np.nan):.4f} ")
+                print(f"Temporal Curvature Diff:  {metrics_dynamics.get('smoothness_diff_overall', np.nan):.4f} ")
+                print(f"Temporal Curvature WD:    {metrics_dynamics.get('smoothness_wd_overall', np.nan):.4f} ")
+
+                print("----")
                 
                 # acf_results = temporal_acf_comparison_2(
                 #     real_df, synth_df, parent_key, num_cols, max_lag=14, time_column=self.time_column
@@ -635,8 +870,15 @@ class TemporalBenchmark:
         temporal_validity = evaluate_temporal_validity(
             real_df, synth_df, time_column=self.time_column
         )
-        results['Temporal Validity'] = temporal_validity['support_jaccard']
-        print(f"Temporal Validity: {temporal_validity['support_jaccard']:.4f} ")
+        results['invalid_timestep_ratio'] = temporal_validity['invalid_rows_ratio']
+        print(f"Invalid Timestep Ratio: {temporal_validity['invalid_rows_ratio']:.4f} ")
+
+        # # Bin Length Discrepancy
+        # metrics_fld = self.bin_length_discrepancy(
+        #     real_df, synth_df, features
+        # )
+        # results['bin_length_discrepancy'] = metrics_fld
+        # print(f"Bin Length Discrepancy: {metrics_fld.get('bin_length_discrepancy_overall', np.nan):.4f}")
 
         # # Temporal Mean/Var MAE (수치형만 의미있음)
         # if num_cols:
@@ -651,7 +893,6 @@ class TemporalBenchmark:
             
         #     print(f"Temporal MAE: {metrics_mean.get('temporal_mean_mae_overall', np.nan):.4f} "
         #           f"± {metrics_var.get('temporal_var_mae_overall', np.nan):.4f}")
-        
         
         # === 범주형 메트릭 ===        
         if cat_cols:
@@ -700,6 +941,12 @@ class TemporalBenchmark:
             )
             results['temporal_mmd'] = metrics_mmd
             print(f"Temporal MMD ({metrics_mmd['kernel']}): {metrics_mmd.get('temporal_mmd_overall', np.nan):.4f}")
+
+            # metrics_spectral = self.temporal_spectral_analysis(
+            #     real_df, synth_df, parent_key, num_cols,
+            # )
+            # results["spectral_wd_overall"] = metrics_spectral
+            # print(f"Temporal Spectral WD: {metrics_spectral.get('spectral_wd_overall', np.nan):.4f}")
         
         print()
         print("=" * 80)

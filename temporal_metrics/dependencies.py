@@ -61,7 +61,7 @@ def transition_matrix_analysis(
             current_states = group['state'][:-1]
             next_states = group['state'][1:]
             transitions.extend(zip(current_states, next_states))
-        
+            
         if not transitions:
             return pd.DataFrame()
         
@@ -182,7 +182,7 @@ def lag_k_diff_analysis(
             # lag-k 차분
             diffs = values.diff(periods=k).dropna()
             all_diffs.extend(diffs.tolist())
-        
+            
         return np.array(all_diffs)
     
     def _lag_diff_metrics(real_diffs, syn_diffs):
@@ -225,6 +225,8 @@ def lag_k_diff_analysis(
         
         # 메트릭 계산
         ks_stat, p_value, wd = _lag_diff_metrics(real_diffs, syn_diffs)
+
+        print(f"syn_diffs 길이: {len(syn_diffs)}")
         
         results["per_feature"][feat] = {
             "ks_stat": ks_stat,

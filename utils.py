@@ -70,105 +70,137 @@ def get_datetime_col_info(metadata, table_name):
             return col, info.get('datetime_format')
     return None, None
 
+import os
+import pandas as pd
+
 def load_and_preprocess_data(data_path, metadata, parent_table_name, child_table_name):
-    """개선된 부모-자식 테이블 병합 (ROBUST VERSION)"""
-    
+    """개선된 부모-자식 테이블 병합 (ROBUST + child column prefix on collision)"""
+
     # 1. 관계 정보 추출
     relationship = next(
-        (r for r in metadata['relationships'] 
-         if r['parent_table_name'] == parent_table_name 
+        (r for r in metadata['relationships']
+         if r['parent_table_name'] == parent_table_name
          and r['child_table_name'] == child_table_name),
         None
     )
-    
+
     if relationship is None:
         print(f"Error: {parent_table_name}-{child_table_name} 관계를 찾을 수 없음")
-        return None
-    
+        return None, None, None
+
     parent_key = relationship['parent_primary_key']
-    child_key = relationship['child_foreign_key']
-    
+    child_key  = relationship['child_foreign_key']
+
     # 2. 데이터 로드
     try:
         parent_df = pd.read_csv(os.path.join(data_path, f"{parent_table_name}.csv"))
-        child_df = pd.read_csv(os.path.join(data_path, f"{child_table_name}.csv"))
+        child_df  = pd.read_csv(os.path.join(data_path, f"{child_table_name}.csv"))
     except FileNotFoundError as e:
         print(f"Error: 파일을 찾을 수 없음 - {e}")
-        return None
-    
+        return None, None, None
+
     # 3. 필수 컬럼 존재 확인
     if parent_key not in parent_df.columns:
         print(f"Error: Parent key '{parent_key}' not found in {parent_table_name}")
-        return None
-    
+        return None, None, None
+
     if child_key not in child_df.columns:
         print(f"Error: Child key '{child_key}' not found in {child_table_name}")
-        return None
-    
-    # 4. 키 타입 통일 (SIMPLIFIED)
-    parent_df, child_df = unify_key_types(
-        parent_df, child_df, parent_key, child_key
-    )
-    
+        return None, None, None
+
+    # 4. 키 타입 통일
+    parent_df, child_df = unify_key_types(parent_df, child_df, parent_key, child_key)
+
     # 5. 병합 전 진단
     diagnosis = diagnose_merge(parent_df, child_df, parent_key, child_key)
-    
+
     if not diagnosis['can_merge']:
         print(f"Error: 병합 불가능 - {diagnosis['reason']}")
-        return None
-    
+        return None, None, None
+
     if diagnosis['warnings']:
         for warning in diagnosis['warnings']:
             print(f"Warning: {warning}")
-    
+
+    # 5.5 컬럼 충돌 처리: child 컬럼만 prefix (키 컬럼 제외)
+    # - 병합 전에 처리해야 merge 결과 컬럼이 깔끔해짐
+    parent_cols = set(parent_df.columns)
+    child_cols  = set(child_df.columns)
+
+    # 겹치는 컬럼들
+    collisions = (parent_cols & child_cols)
+
+    # 키는 rename하면 안 됨
+    protected = {child_key, parent_key}
+    rename_targets = sorted([c for c in collisions if c not in protected])
+
+    if rename_targets:
+        rename_map = {c: f"{child_table_name}_{c}" for c in rename_targets}
+        child_df = child_df.rename(columns=rename_map)
+        print(f"ℹ️ Renamed {len(rename_targets)} colliding child columns with prefix '{child_table_name}_'")
+
     # 6. 병합 수행
     try:
         merged_df = pd.merge(
-            child_df, 
-            parent_df, 
-            left_on=child_key, 
-            right_on=parent_key, 
+            child_df,
+            parent_df,
+            left_on=child_key,
+            right_on=parent_key,
             how='inner',
-            validate='many_to_one'  # 👈 관계 검증 추가!
+            validate='many_to_one'
         )
     except pd.errors.MergeError as e:
         print(f"Error: 병합 실패 - {e}")
-        return None
-    
+        return None, None, None
+
     if merged_df.empty:
         print("Error: 병합 결과가 비어있음")
-        return None
-    
+        return None, None, None
+
     print(f"✅ Merge Completed: {len(merged_df)} rows")
-    
+
     # 7. Datetime 컬럼 처리
+    # child table datetime 컬럼이 collision으로 rename 되었을 수 있으니 반영
     datetime_col, datetime_format = get_datetime_col_info(metadata, child_table_name)
-    
-    if datetime_col and datetime_col in merged_df.columns:
+    print("datetime col: ", datetime_col)
+
+    # collision으로 rename된 경우, 실제 merged 컬럼명으로 치환
+    if datetime_col:
+        # child datetime_col이 rename_targets에 포함됐으면 prefix 버전으로 존재
+        prefixed_datetime_col = f"{child_table_name}_{datetime_col}"
+        if prefixed_datetime_col in merged_df.columns:
+            datetime_col_in_merged = prefixed_datetime_col
+        else:
+            datetime_col_in_merged = datetime_col
+    else:
+        datetime_col_in_merged = None
+
+    if datetime_col_in_merged and datetime_col_in_merged in merged_df.columns:
         try:
-            merged_df[datetime_col] = pd.to_datetime(
-                merged_df[datetime_col], 
+            merged_df[datetime_col_in_merged] = pd.to_datetime(
+                merged_df[datetime_col_in_merged],
                 # format=datetime_format,
                 errors='coerce'
             ).dt.floor('D')
-            
-            # NaT가 너무 많으면 경고
-            nat_ratio = merged_df[datetime_col].isna().sum() / len(merged_df)
+
+            nat_ratio = merged_df[datetime_col_in_merged].isna().sum() / len(merged_df)
             if nat_ratio > 0.1:
                 print(f"Warning: {nat_ratio:.1%}의 날짜 변환 실패")
-                
+
         except Exception as e:
             print(f"Warning: datetime 변환 실패 ({e}), datetime_col을 None으로 설정")
-            datetime_col = None
-    
+            datetime_col_in_merged = None
+
     # 8. 정렬
     sort_cols = [parent_key]
-    if datetime_col and datetime_col in merged_df.columns:
-        sort_cols.append(datetime_col)
-    
+    if datetime_col_in_merged and datetime_col_in_merged in merged_df.columns:
+        sort_cols.append(datetime_col_in_merged)
+
     merged_df = merged_df.sort_values(by=sort_cols).reset_index(drop=True)
-    
-    return merged_df, parent_key, datetime_col
+
+    # ✅ 반환값: merged_df, parent_key, (merged_df에서 실제로 쓰는 datetime_col 이름)
+    return merged_df, parent_key, datetime_col_in_merged
+
 
 
 def unify_key_types(parent_df, child_df, parent_key, child_key):

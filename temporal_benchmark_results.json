@@ -1,188 +1,244 @@
 {
   "transition_matrix": {
     "per_feature": {
-      "DayOfWeek": {
-        "tm_l1": 0.16197747724822506,
-        "tm_jsd": 0.3925476892951751
-      },
-      "Date": {
-        "tm_l1": 0.019207409485567692,
-        "tm_jsd": 0.5272893281121142
-      },
-      "Customers": {
-        "tm_l1": 0.21888170504906906,
-        "tm_jsd": 0.4479222801974657
-      },
-      "Open": {
-        "tm_l1": 0.026787118126523665,
-        "tm_jsd": 0.06848057637126193
-      },
-      "Promo": {
-        "tm_l1": 0.0006793643222500556,
-        "tm_jsd": 0.0015650424861969694
-      },
-      "StateHoliday": {
+      "Size": {
         "tm_l1": 0.0,
         "tm_jsd": 0.0
       },
-      "SchoolHoliday": {
-        "tm_l1": 0.015852715576113254,
-        "tm_jsd": 0.03631472276886011
+      "CPI": {
+        "tm_l1": 0.08,
+        "tm_jsd": 0.2600955057799636
       },
-      "Id": {
-        "tm_l1": 0.02580645161290323,
-        "tm_jsd": 0.1357570642748026
+      "Fuel_Price": {
+        "tm_l1": 0.07431143050497889,
+        "tm_jsd": 0.18690889108949113
       },
-      "Store": {
-        "tm_l1": 0.0,
-        "tm_jsd": 0.0
+      "MarkDown1": {
+        "tm_l1": 0.1309187355277619,
+        "tm_jsd": 0.29654662866806913
       },
-      "StoreType": {
-        "tm_l1": 0.0,
-        "tm_jsd": 0.0
+      "MarkDown2": {
+        "tm_l1": 0.16850361197110422,
+        "tm_jsd": 0.39020320469493985
       },
-      "Assortment": {
-        "tm_l1": 0.0,
-        "tm_jsd": 0.0
+      "MarkDown3": {
+        "tm_l1": 0.2641573631047315,
+        "tm_jsd": 0.5703774278932902
       },
-      "CompetitionDistance": {
-        "tm_l1": 0.0,
-        "tm_jsd": 0.0
+      "MarkDown4": {
+        "tm_l1": 0.14256360506962917,
+        "tm_jsd": 0.36053552451823767
       },
-      "CompetitionOpenSinceMonth": {
-        "tm_l1": 0.0,
-        "tm_jsd": 0.0
+      "MarkDown5": {
+        "tm_l1": 0.1236612157630566,
+        "tm_jsd": 0.3125411020461851
       },
-      "CompetitionOpenSinceYear": {
-        "tm_l1": 0.04,
-        "tm_jsd": 0.1300477528899818
+      "Temperature": {
+        "tm_l1": 0.1010829593157503,
+        "tm_jsd": 0.2079523235538238
       },
-      "Promo2": {
-        "tm_l1": 0.0,
-        "tm_jsd": 0.0
-      },
-      "Promo2SinceWeek": {
-        "tm_l1": 0.0,
-        "tm_jsd": 0.0
-      },
-      "Promo2SinceYear": {
-        "tm_l1": 0.0,
-        "tm_jsd": 0.0
-      },
-      "PromoInterval": {
+      "Unemployment": {
         "tm_l1": 0.0,
         "tm_jsd": 0.0
       }
     },
-    "tm_l1_overall": 0.02828845785670289,
-    "tm_jsd_overall": 0.09666246979976992
+    "tm_l1_overall": 0.07501560634461327,
+    "tm_jsd_overall": 0.17804672472134042
   },
   "lag_diff": {
     "per_feature": {
-      "CompetitionDistance": {
+      "Size": {
         "ks_stat": 0.0,
         "p_value": 1.0,
         "wasserstein_distance": 0.0
       },
-      "CompetitionOpenSinceMonth": {
+      "CPI": {
+        "ks_stat": 0.2916666666666667,
+        "p_value": 1.7274939518679311e-06,
+        "wasserstein_distance": 0.0003939800340367354
+      },
+      "Fuel_Price": {
+        "ks_stat": 0.1763888888888889,
+        "p_value": 0.01213475578529623,
+        "wasserstein_distance": 0.014989865487377926
+      },
+      "MarkDown1": {
+        "ks_stat": 0.15857142857142856,
+        "p_value": 0.035913321195794316,
+        "wasserstein_distance": 0.057109448110277086
+      },
+      "MarkDown2": {
+        "ks_stat": 0.4423076923076923,
+        "p_value": 1.6684787630000438e-10,
+        "wasserstein_distance": 0.10751693108869617
+      },
+      "MarkDown3": {
+        "ks_stat": 0.19420301908762008,
+        "p_value": 0.004938670055180413,
+        "wasserstein_distance": 0.019103127736277963
+      },
+      "MarkDown4": {
+        "ks_stat": 0.11647585863613738,
+        "p_value": 0.2935731378705465,
+        "wasserstein_distance": 0.05179321665694564
+      },
+      "MarkDown5": {
+        "ks_stat": 0.1986111111111111,
+        "p_value": 0.0031146523929707045,
+        "wasserstein_distance": 0.03069921527718588
+      },
+      "Temperature": {
+        "ks_stat": 0.2902777777777778,
+        "p_value": 1.974628579247419e-06,
+        "wasserstein_distance": 0.04636919483374553
+      },
+      "Unemployment": {
         "ks_stat": 0.0,
         "p_value": 1.0,
         "wasserstein_distance": 0.0
-      },
-      "CompetitionOpenSinceYear": {
-        "ks_stat": 0.0,
-        "p_value": 1.0,
-        "wasserstein_distance": 0.0
-      },
-      "Promo2SinceWeek": {
-        "ks_stat": 0.0,
-        "p_value": 1.0,
-        "wasserstein_distance": 0.0
-      },
-      "Promo2SinceYear": {
-        "ks_stat": 0.0,
-        "p_value": 1.0,
-        "wasserstein_distance": 0.0
-      },
-      "Customers": {
-        "ks_stat": 0.1836545364510649,
-        "p_value": 0.0,
-        "wasserstein_distance": 0.027605456134236653
       }
     },
-    "lag_diff_ks_overall": 0.030609089408510815,
-    "lag_diff_wasserstein_overall": 0.004600909355706109
+    "lag_diff_ks_overall": 0.11326147295312493,
+    "lag_diff_wasserstein_overall": 0.021817038074532964
   },
-  "Temporal Validity": 0.0,
+  "temporal dynamics": {
+    "per_feature": {
+      "CPI": {
+        "real_tp_rate": 0.0,
+        "syn_tp_rate": 0.16666666666666663,
+        "tp_diff": 0.16666666666666663,
+        "real_smoothness": 0.00024360590794432946,
+        "syn_smoothness": 0.0016294952426287868,
+        "smoothness_diff": 0.0013858893346844572,
+        "smoothness_wd_pooled": 0.0013858893346844572
+      },
+      "Fuel_Price": {
+        "real_tp_rate": 0.41481481481481475,
+        "syn_tp_rate": 0.38888888888888884,
+        "tp_diff": 0.025925925925925908,
+        "real_smoothness": 0.06251458755604672,
+        "syn_smoothness": 0.06836189423254095,
+        "smoothness_diff": 0.005847306676494232,
+        "smoothness_wd_pooled": 0.015361464283520693
+      },
+      "MarkDown1": {
+        "real_tp_rate": 0.6074074074074074,
+        "syn_tp_rate": 0.662037037037037,
+        "tp_diff": 0.054629629629629584,
+        "real_smoothness": 0.29828331516201817,
+        "syn_smoothness": 0.25823428376559493,
+        "smoothness_diff": 0.04004903139642324,
+        "smoothness_wd_pooled": 0.06883470599582922
+      },
+      "MarkDown2": {
+        "real_tp_rate": 0.6666666666666666,
+        "syn_tp_rate": 0.5882352941176471,
+        "tp_diff": 0.07843137254901955,
+        "real_smoothness": 0.18694374971378128,
+        "syn_smoothness": 0.18886055246490138,
+        "smoothness_diff": 0.0019168027511201058,
+        "smoothness_wd_pooled": 0.07519431567440091
+      },
+      "MarkDown3": {
+        "real_tp_rate": 0.6777777777777778,
+        "syn_tp_rate": 0.5441176470588235,
+        "tp_diff": 0.13366013071895433,
+        "real_smoothness": 0.07681473506510052,
+        "syn_smoothness": 0.08215485255380964,
+        "smoothness_diff": 0.00534011748870912,
+        "smoothness_wd_pooled": 0.021752758785835522
+      },
+      "MarkDown4": {
+        "real_tp_rate": 0.48198198198198183,
+        "syn_tp_rate": 0.5523809523809523,
+        "tp_diff": 0.07039897039897047,
+        "real_smoothness": 0.2823908916855163,
+        "syn_smoothness": 0.314036210204956,
+        "smoothness_diff": 0.03164531851943969,
+        "smoothness_wd_pooled": 0.06929659436303368
+      },
+      "MarkDown5": {
+        "real_tp_rate": 0.4592592592592593,
+        "syn_tp_rate": 0.5,
+        "tp_diff": 0.04074074074074069,
+        "real_smoothness": 0.16761538711138693,
+        "syn_smoothness": 0.20129484563480327,
+        "smoothness_diff": 0.033679458523416334,
+        "smoothness_wd_pooled": 0.05131705309064819
+      },
+      "Temperature": {
+        "real_tp_rate": 0.6518518518518518,
+        "syn_tp_rate": 0.4722222222222222,
+        "tp_diff": 0.17962962962962958,
+        "real_smoothness": 0.16056150957222684,
+        "syn_smoothness": 0.0853752557173827,
+        "smoothness_diff": 0.07518625385484413,
+        "smoothness_wd_pooled": 0.07522136728649503
+      }
+    },
+    "turning_point_diff_overall": 0.05183564095959044,
+    "smoothness_diff_overall": 0.03232240781395555,
+    "smoothness_wd_overall": 0.0568035171687383
+  },
+  "invalid_timestep_ratio": 0.6927863751739949,
   "temporal_jsd": {
     "per_feature": {
-      "StoreType": 0.02810636452661992,
-      "Assortment": 0.021115928541496277,
-      "Promo2": 0.009193931382842904,
-      "PromoInterval": 0.02606182863470775,
-      "DayOfWeek": 0.02166076116065572,
-      "Open": 0.014256490850031004,
-      "Promo": 0.009138783554315705,
-      "StateHoliday": 0.0,
-      "SchoolHoliday": 0.007027268665635357
+      "Type": 0.15374822490185774,
+      "IsHoliday": 0.33855332454169984
     },
-    "temporal_jsd_overall": 0.01517348414625607
+    "temporal_jsd_overall": 0.22545484808135868
   },
   "temporal_tv": {
     "per_feature": {
-      "StoreType": 0.01461738852319347,
-      "Assortment": 0.01735121837675444,
-      "Promo2": 0.010734733877457495,
-      "PromoInterval": 0.027443111555454185,
-      "DayOfWeek": 0.019380886462124755,
-      "Open": 0.010991880170902241,
-      "Promo": 0.007351614226087202,
-      "StateHoliday": 6.106226635438361e-17,
-      "SchoolHoliday": 0.007165259407816577
+      "Type": 0.15885129268018258,
+      "IsHoliday": 0.23009927424093415
     },
-    "temporal_tv_overall": 0.01278178806664338
+    "temporal_tv_overall": 0.17873574569966227
   },
   "temporal_wasserstein": {
     "per_feature": {
-      "CompetitionDistance": 0.009261658933381631,
-      "CompetitionOpenSinceMonth": 0.08592187216208935,
-      "CompetitionOpenSinceYear": 0.024014497771363323,
-      "Promo2SinceWeek": 0.14651478317553515,
-      "Promo2SinceYear": 0.13283160830687296,
-      "Customers": 0.0031804558526496115
+      "Size": 0.0652838104881936,
+      "CPI": 0.21041555477928026,
+      "Fuel_Price": 0.14375334721884045,
+      "MarkDown1": 0.12846710371149364,
+      "MarkDown2": 0.2559547069988169,
+      "MarkDown3": 0.0698199825163169,
+      "MarkDown4": 0.1230430836550374,
+      "MarkDown5": 0.08987316676590684,
+      "Temperature": 0.06566647869683036,
+      "Unemployment": 0.10031089101136341
     },
-    "temporal_wasserstein_overall": 0.06695414603364867
+    "temporal_wasserstein_overall": 0.08121163246347547
   },
   "temporal_ks": {
     "per_feature": {
-      "CompetitionDistance": 0.05071437548934994,
-      "CompetitionOpenSinceMonth": 0.17657005230981568,
-      "CompetitionOpenSinceYear": 0.2199351399253747,
-      "Promo2SinceWeek": 0.33590323342653433,
-      "Promo2SinceYear": 0.3165486656812198,
-      "Customers": 0.021618403327081134
+      "Size": 0.18583270895510923,
+      "CPI": 0.4335952853556247,
+      "Fuel_Price": 0.4185714285714286,
+      "MarkDown1": 0.32043303550461555,
+      "MarkDown2": 0.7914432367149757,
+      "MarkDown3": 0.3848494165292663,
+      "MarkDown4": 0.423922777374683,
+      "MarkDown5": 0.3508897123849404,
+      "Temperature": 0.20416712308546878,
+      "Unemployment": 0.36070674347450593
     },
-    "temporal_ks_overall": 0.1868816450265626
+    "temporal_ks_overall": 0.25776005840676525
   },
   "temporal_mmd": {
     "kernel": "rbf",
     "params": {
       "gamma": 1.0,
-      "degree": 2,
+      "degree": 2.0,
       "coef0": 0.0
     },
     "per_time_bin": {
-      "2014-07-28/2014-08-03": 0.015488600832910038,
-      "2014-08-04/2014-08-10": 0.0166172354009817,
-      "2014-08-11/2014-08-17": 0.016706330883251796,
-      "2014-08-18/2014-08-24": 0.01752758393997822,
-      "2014-08-25/2014-08-31": 0.017398868907886333,
-      "2014-09-01/2014-09-07": 0.015743506830810716,
-      "2014-09-08/2014-09-14": 0.017313500369769752,
-      "2014-09-15/2014-09-21": 0.01567814105615528,
-      "2014-09-22/2014-09-28": 0.016629738112585946,
-      "2014-09-29/2014-10-05": 0.01662020212374915
+      "2011-11-28/2011-12-04": 0.06456489936267001,
+      "2011-12-05/2011-12-11": 0.13284894998059288,
+      "2011-12-12/2011-12-18": 0.09699756940191906,
+      "2011-12-19/2011-12-25": 0.10238709207770541,
+      "2011-12-26/2012-01-01": 0.049752149966296066
     },
-    "temporal_mmd_overall": 0.016572370845807892
+    "temporal_mmd_overall": 0.08931013215783669
   }
 }

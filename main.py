@@ -47,12 +47,12 @@ def run_temporal_benchmark(
     
     metadata = utils.load_metadata(real_path, dataset_name)
 
-    # 월별 binning
-    benchmark = temporal_benchmark.TemporalBenchmark(
-        metadata=metadata,
-        time_column='Date',
-        bin_strategy=bin_strategy,
-    )
+    # # 월별 binning
+    # benchmark = temporal_benchmark.TemporalBenchmark(
+    #     metadata=metadata,
+    #     time_column='Date',
+    #     bin_strategy=bin_strategy,
+    # )
     
     for relationship in metadata['relationships']:
         parent_table = relationship['parent_table_name']
@@ -62,13 +62,21 @@ def run_temporal_benchmark(
         
         print(f"\n--- Relationship: {parent_table} -> {child_table} ---")
 
+        time_col = None
         real_data_path = os.path.join(real_path, dataset_name)
         print("Merging real data...")
         real_df, _, _ = utils.load_and_preprocess_data(real_data_path, metadata, parent_table, child_table)
         print("Merging synthetic data...")
-        synth_df, _, _ = utils.load_and_preprocess_data(synth_path, metadata, parent_table, child_table)
+        synth_df, _, time_col = utils.load_and_preprocess_data(synth_path, metadata, parent_table, child_table)
         
         available_features = synth_df.columns
+
+        if time_col == None : continue
+        benchmark = temporal_benchmark.TemporalBenchmark(
+            metadata=metadata,
+            time_column=time_col,
+            bin_strategy=bin_strategy,
+        )  
         
         if parent_key not in real_df.columns or parent_key not in synth_df.columns:
             print(f"Warning: Parent key '{parent_key}' not found in merged dataframe")
@@ -81,6 +89,8 @@ def run_temporal_benchmark(
 
         cat_cols = benchmark.get_categorical_columns(real_df, available_features, parent_table) 
         cat_cols.extend(benchmark.get_categorical_columns(real_df, available_features, child_table))
+        
+        # """
         
         # 종합 평가 수행
         try:
@@ -99,6 +109,21 @@ def run_temporal_benchmark(
         except Exception as e:
             print(f"❌ Error evaluating {child_table}: {str(e)}")
 
+
+        """
+
+        real_binned = benchmark.create_time_bins(real_df)
+        syn_binned = benchmark.create_time_bins(synth_df)
+
+        print(syn_binned['Date'].sort_values().value_counts())
+
+        # print("찐 데이터 tiem bin nunique")
+        # print(real_binned['time_bin'].value_counts())
+        # print("\n짭 데이터 tiem bin nunique")
+        # print(syn_binned['time_bin'].value_counts())
+        
+        """
+
     # [수정] 결과 집계 (Aggregation)
     # 관계가 1개면 그대로, 2개 이상이면 평균 계산
     final_results = aggregate_metrics(all_relationships_results)
@@ -114,12 +139,13 @@ def run_temporal_benchmark(
 
 if __name__ == "__main__":
     
-    #                 0           1             2           3        4        5 
+    #                 0           1             2           3        4        5
     syn_models = ['CLAVADDPM', 'RCTGAN', 'REALTABFORMER', 'RGCLD', 'SDV', 'RelDiff']
-    syn_model_name = syn_models[0]
+    syn_model_name = syn_models[4]
     
-    DATASET = 'rossmann_subsampled'
-    # DATASET = 'walmart_subsampled'
+    # DATASET = 'rossmann_subsampled'
+    DATASET = 'walmart_subsampled'
+    # DATASET = 'berka'
 
     # 실행
     results = run_temporal_benchmark(
@@ -134,5 +160,5 @@ if __name__ == "__main__":
         import json
         with open('temporal_benchmark_results.json', 'w') as f:
             json.dump(results, f, indent=2, default=str)
-        print("\n✅ Results saved to temporal_benchmark_results.json")
+        print("\n✅ Results saved to temporal_benchmark_results.json")        
 
